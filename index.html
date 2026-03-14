@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Game Bắn Súng</title>
+<style>
+body{
+    margin:0;
+    overflow:hidden;
+    background:black;
+}
+canvas{
+    display:block;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<script>
+let canvas = document.getElementById("game");
+let ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let player = {
+    x: canvas.width/2,
+    y: canvas.height-60,
+    size: 20
+};
+
+let bullets = [];
+let enemies = [];
+
+document.addEventListener("mousemove", e=>{
+    player.x = e.clientX;
+});
+
+document.addEventListener("click", ()=>{
+    bullets.push({
+        x: player.x,
+        y: player.y
+    });
+});
+
+function spawnEnemy(){
+    enemies.push({
+        x: Math.random()*canvas.width,
+        y: 0,
+        size:20
+    });
+}
+
+setInterval(spawnEnemy,1000);
+
+function update(){
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // player
+    ctx.fillStyle="cyan";
+    ctx.fillRect(player.x-player.size/2,player.y,player.size,player.size);
+
+    // bullets
+    ctx.fillStyle="yellow";
+    bullets.forEach((b,i)=>{
+        b.y-=10;
+        ctx.fillRect(b.x-2,b.y,4,10);
+    });
+
+    // enemies
+    ctx.fillStyle="red";
+    enemies.forEach((e,ei)=>{
+        e.y+=2;
+        ctx.fillRect(e.x,e.y,e.size,e.size);
+
+        bullets.forEach((b,bi)=>{
+            if(
+                b.x>e.x &&
+                b.x<e.x+e.size &&
+                b.y>e.y &&
+                b.y<e.y+e.size
+            ){
+                enemies.splice(ei,1);
+                bullets.splice(bi,1);
+            }
+        });
+    });
+
+    requestAnimationFrame(update);
+}
+
+update();
+</script>
+
+</body>
+</html>
