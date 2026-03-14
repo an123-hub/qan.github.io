@@ -2,34 +2,39 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Zombie Survival 100x100</title>
+<title>Zombie Survival 100x100 - Spacebar Shooting</title>
 <style>
-body { margin:0; background:black; overflow:hidden; }
+body { margin:0; background:black; overflow:hidden; font-family:sans-serif; }
 canvas { display:block; margin:auto; background:#222; }
+#hud {
+    position:absolute; top:10px; left:10px; color:white; font-size:18px;
+}
 </style>
 </head>
 <body>
+<div id="hud">HP: 100 | Điểm: 0</div>
 <canvas id="game" width="600" height="600"></canvas>
 
 <script>
 let canvas = document.getElementById("game");
 let ctx = canvas.getContext("2d");
+let hud = document.getElementById("hud");
 
 const mapSize = 100;
 const tile = 6; // 100x100 map scaled to 600x600
 
-// Generate map: 0=empty, 1=tree
+// Map: 0 = đất trống, 1 = cây
 let map = [];
 for(let y=0;y<mapSize;y++){
     let row=[];
     for(let x=0;x<mapSize;x++){
-        row.push(Math.random()<0.1 ? 1 : 0); // 10% cây
+        row.push(Math.random()<0.1 ? 1 : 0);
     }
     map.push(row);
 }
 
 // Player
-let player = {x:50, y:50, gun:false};
+let player = {x:50, y:50, hp:100, gun:true};
 
 // Gun
 let gun = {x:Math.floor(Math.random()*mapSize), y:Math.floor(Math.random()*mapSize), active:true};
@@ -37,18 +42,36 @@ let gun = {x:Math.floor(Math.random()*mapSize), y:Math.floor(Math.random()*mapSi
 // Zombies
 let zombies=[];
 
-// Keyboard
+// Bullets
+let bullets=[];
+
+// Score
+let score=0;
+
+// Keys
 let keys={};
-document.addEventListener("keydown", e=>keys[e.key]=true);
+let lastDir = {x:0,y:-1}; // hướng mặc định lên trên
+document.addEventListener("keydown", e=>{
+    keys[e.key]=true;
+    if(e.key=="w") lastDir={x:0,y:-1};
+    if(e.key=="s") lastDir={x:0,y:1};
+    if(e.key=="a") lastDir={x:-1,y:0};
+    if(e.key=="d") lastDir={x:1,y:0};
+
+    // Spacebar bắn
+    if(e.code==="Space" && player.gun){
+        bullets.push({x:player.x, y:player.y, dx:lastDir.x*1.5, dy:lastDir.y*1.5});
+    }
+});
 document.addEventListener("keyup", e=>keys[e.key]=false);
 
-// Helper: check if cell is walkable
+// Helper: walkable
 function canMove(x,y){
     x=Math.floor(x); y=Math.floor(y);
     return x>=0 && x<mapSize && y>=0 && y<mapSize && map[y][x]==0;
 }
 
-// Spawn zombie at random location
+// Spawn zombie at random walkable location
 function spawnZombie(){
     let x,y;
     do{
@@ -74,22 +97,51 @@ function update(){
         for(let i=0;i<5;i++) spawnZombie();
     }
 
-    // Move zombies toward player
+    // Move zombies
     zombies.forEach(z=>{
         let dx = player.x - z.x;
         let dy = player.y - z.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
         if(dist>0){
-            let speed = 0.3; // zombie speed
+            let speed = 0.3;
             let nx = z.x + dx/dist*speed;
             let ny = z.y + dy/dist*speed;
             if(canMove(nx,ny)){
                 z.x = nx; z.y = ny;
             }
         }
+        // Zombie hits player
+        if(Math.abs(z.x - player.x)<1 && Math.abs(z.y - player.y)<1){
+            player.hp-=0.5;
+            if(player.hp<=0){
+                alert("Game Over! Điểm: "+score);
+                location.reload();
+            }
+        }
+    });
+
+    // Update bullets
+    bullets.forEach((b,bi)=>{
+        b.x += b.dx;
+        b.y += b.dy;
+
+        // Check collision with zombies
+        zombies.forEach((z,zi)=>{
+            if(Math.abs(b.x - z.x)<1 && Math.abs(b.y - z.y)<1){
+                zombies.splice(zi,1);
+                bullets.splice(bi,1);
+                score+=10;
+            }
+        });
+
+        // Remove bullets out of map
+        if(b.x<0 || b.x>=mapSize || b.y<0 || b.y>=mapSize){
+            bullets.splice(bi,1);
+        }
     });
 
     draw();
+    hud.innerText = `HP: ${Math.floor(player.hp)} | Điểm: ${score}`;
     requestAnimationFrame(update);
 }
 
@@ -97,7 +149,7 @@ function update(){
 function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // Camera: center on player
+    // Camera offset
     let offsetX = player.x*tile - canvas.width/2 + tile/2;
     let offsetY = player.y*tile - canvas.height/2 + tile/2;
 
@@ -121,6 +173,12 @@ function draw(){
     ctx.fillStyle="red";
     zombies.forEach(z=>{
         ctx.fillRect(z.x*tile - offsetX, z.y*tile - offsetY, tile, tile);
+    });
+
+    // Draw bullets
+    ctx.fillStyle="white";
+    bullets.forEach(b=>{
+        ctx.fillRect(b.x*tile - offsetX, b.y*tile - offsetY, tile/2, tile/2);
     });
 
     // Draw player
