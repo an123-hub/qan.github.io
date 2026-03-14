@@ -2,13 +2,12 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Zombie Game</title>
+<title>Zombie Survival 100x100</title>
 <style>
-body{margin:0;background:black;}
-canvas{display:block;margin:auto;background:#222;}
+body { margin:0; background:black; overflow:hidden; }
+canvas { display:block; margin:auto; background:#222; }
 </style>
 </head>
-
 <body>
 <canvas id="game" width="600" height="600"></canvas>
 
@@ -16,72 +15,120 @@ canvas{display:block;margin:auto;background:#222;}
 let canvas = document.getElementById("game");
 let ctx = canvas.getContext("2d");
 
-let tile = 6; // 100x100 map
-let player = {x:50,y:50,gun:false};
-let gun = {x:20,y:20,active:true};
-let zombies = [];
+const mapSize = 100;
+const tile = 6; // 100x100 map scaled to 600x600
 
-let keys={};
-
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
-
-function spawnZombie(){
-    zombies.push({x:Math.random()*100,y:Math.random()*100});
+// Generate map: 0=empty, 1=tree
+let map = [];
+for(let y=0;y<mapSize;y++){
+    let row=[];
+    for(let x=0;x<mapSize;x++){
+        row.push(Math.random()<0.1 ? 1 : 0); // 10% cây
+    }
+    map.push(row);
 }
 
+// Player
+let player = {x:50, y:50, gun:false};
+
+// Gun
+let gun = {x:Math.floor(Math.random()*mapSize), y:Math.floor(Math.random()*mapSize), active:true};
+
+// Zombies
+let zombies=[];
+
+// Keyboard
+let keys={};
+document.addEventListener("keydown", e=>keys[e.key]=true);
+document.addEventListener("keyup", e=>keys[e.key]=false);
+
+// Helper: check if cell is walkable
+function canMove(x,y){
+    x=Math.floor(x); y=Math.floor(y);
+    return x>=0 && x<mapSize && y>=0 && y<mapSize && map[y][x]==0;
+}
+
+// Spawn zombie at random location
+function spawnZombie(){
+    let x,y;
+    do{
+        x=Math.random()*mapSize;
+        y=Math.random()*mapSize;
+    }while(!canMove(x,y));
+    zombies.push({x:x, y:y});
+}
+
+// Update
 function update(){
 
-    if(keys["w"]) player.y--;
-    if(keys["s"]) player.y++;
-    if(keys["a"]) player.x--;
-    if(keys["d"]) player.x++;
+    // Move player
+    if(keys["w"] && canMove(player.x, player.y-1)) player.y--;
+    if(keys["s"] && canMove(player.x, player.y+1)) player.y++;
+    if(keys["a"] && canMove(player.x-1, player.y)) player.x--;
+    if(keys["d"] && canMove(player.x+1, player.y)) player.x++;
 
-    player.x=Math.max(0,Math.min(99,player.x));
-    player.y=Math.max(0,Math.min(99,player.y));
-
-    if(gun.active && player.x==gun.x && player.y==gun.y){
+    // Pick up gun
+    if(gun.active && Math.abs(player.x - gun.x)<1 && Math.abs(player.y - gun.y)<1){
         player.gun=true;
         gun.active=false;
-
         for(let i=0;i<5;i++) spawnZombie();
     }
 
+    // Move zombies toward player
     zombies.forEach(z=>{
         let dx = player.x - z.x;
         let dy = player.y - z.y;
-        let dist = Math.sqrt(dx*dx+dy*dy);
-
-        z.x += dx/dist*0.2;
-        z.y += dy/dist*0.2;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist>0){
+            let speed = 0.3; // zombie speed
+            let nx = z.x + dx/dist*speed;
+            let ny = z.y + dy/dist*speed;
+            if(canMove(nx,ny)){
+                z.x = nx; z.y = ny;
+            }
+        }
     });
 
     draw();
     requestAnimationFrame(update);
 }
 
+// Draw everything
 function draw(){
-    ctx.clearRect(0,0,600,600);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // player
-    ctx.fillStyle="cyan";
-    ctx.fillRect(player.x*tile,player.y*tile,tile,tile);
+    // Camera: center on player
+    let offsetX = player.x*tile - canvas.width/2 + tile/2;
+    let offsetY = player.y*tile - canvas.height/2 + tile/2;
 
-    // gun
-    if(gun.active){
-        ctx.fillStyle="yellow";
-        ctx.fillRect(gun.x*tile,gun.y*tile,tile,tile);
+    // Draw map
+    for(let y=0;y<mapSize;y++){
+        for(let x=0;x<mapSize;x++){
+            if(map[y][x]==1){
+                ctx.fillStyle="green";
+                ctx.fillRect(x*tile - offsetX, y*tile - offsetY, tile, tile);
+            }
+        }
     }
 
-    // zombies
+    // Draw gun
+    if(gun.active){
+        ctx.fillStyle="yellow";
+        ctx.fillRect(gun.x*tile - offsetX, gun.y*tile - offsetY, tile, tile);
+    }
+
+    // Draw zombies
     ctx.fillStyle="red";
     zombies.forEach(z=>{
-        ctx.fillRect(z.x*tile,z.y*tile,tile,tile);
+        ctx.fillRect(z.x*tile - offsetX, z.y*tile - offsetY, tile, tile);
     });
+
+    // Draw player
+    ctx.fillStyle="cyan";
+    ctx.fillRect(player.x*tile - offsetX, player.y*tile - offsetY, tile, tile);
 }
 
 update();
 </script>
-
 </body>
 </html>
