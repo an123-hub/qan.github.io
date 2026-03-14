@@ -2,95 +2,82 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Game Bắn Súng</title>
+<title>Zombie Game</title>
 <style>
-body{
-    margin:0;
-    overflow:hidden;
-    background:black;
-}
-canvas{
-    display:block;
-}
+body{margin:0;background:black;}
+canvas{display:block;margin:auto;background:#222;}
 </style>
 </head>
 
 <body>
-
-<canvas id="game"></canvas>
+<canvas id="game" width="600" height="600"></canvas>
 
 <script>
 let canvas = document.getElementById("game");
 let ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+let tile = 6; // 100x100 map
+let player = {x:50,y:50,gun:false};
+let gun = {x:20,y:20,active:true};
+let zombies = [];
 
-let player = {
-    x: canvas.width/2,
-    y: canvas.height-60,
-    size: 20
-};
+let keys={};
 
-let bullets = [];
-let enemies = [];
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
 
-document.addEventListener("mousemove", e=>{
-    player.x = e.clientX;
-});
-
-document.addEventListener("click", ()=>{
-    bullets.push({
-        x: player.x,
-        y: player.y
-    });
-});
-
-function spawnEnemy(){
-    enemies.push({
-        x: Math.random()*canvas.width,
-        y: 0,
-        size:20
-    });
+function spawnZombie(){
+    zombies.push({x:Math.random()*100,y:Math.random()*100});
 }
-
-setInterval(spawnEnemy,1000);
 
 function update(){
 
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(keys["w"]) player.y--;
+    if(keys["s"]) player.y++;
+    if(keys["a"]) player.x--;
+    if(keys["d"]) player.x++;
+
+    player.x=Math.max(0,Math.min(99,player.x));
+    player.y=Math.max(0,Math.min(99,player.y));
+
+    if(gun.active && player.x==gun.x && player.y==gun.y){
+        player.gun=true;
+        gun.active=false;
+
+        for(let i=0;i<5;i++) spawnZombie();
+    }
+
+    zombies.forEach(z=>{
+        let dx = player.x - z.x;
+        let dy = player.y - z.y;
+        let dist = Math.sqrt(dx*dx+dy*dy);
+
+        z.x += dx/dist*0.2;
+        z.y += dy/dist*0.2;
+    });
+
+    draw();
+    requestAnimationFrame(update);
+}
+
+function draw(){
+    ctx.clearRect(0,0,600,600);
 
     // player
     ctx.fillStyle="cyan";
-    ctx.fillRect(player.x-player.size/2,player.y,player.size,player.size);
+    ctx.fillRect(player.x*tile,player.y*tile,tile,tile);
 
-    // bullets
-    ctx.fillStyle="yellow";
-    bullets.forEach((b,i)=>{
-        b.y-=10;
-        ctx.fillRect(b.x-2,b.y,4,10);
-    });
+    // gun
+    if(gun.active){
+        ctx.fillStyle="yellow";
+        ctx.fillRect(gun.x*tile,gun.y*tile,tile,tile);
+    }
 
-    // enemies
+    // zombies
     ctx.fillStyle="red";
-    enemies.forEach((e,ei)=>{
-        e.y+=2;
-        ctx.fillRect(e.x,e.y,e.size,e.size);
-
-        bullets.forEach((b,bi)=>{
-            if(
-                b.x>e.x &&
-                b.x<e.x+e.size &&
-                b.y>e.y &&
-                b.y<e.y+e.size
-            ){
-                enemies.splice(ei,1);
-                bullets.splice(bi,1);
-            }
-        });
+    zombies.forEach(z=>{
+        ctx.fillRect(z.x*tile,z.y*tile,tile,tile);
     });
-
-    requestAnimationFrame(update);
 }
 
 update();
