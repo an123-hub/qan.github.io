@@ -2,111 +2,163 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Simple 3D Shooter</title>
+<title>Mini FPS Zombie</title>
 <style>
 body{margin:0;overflow:hidden;}
+#hp{position:absolute;top:10px;left:10px;color:white;font-size:20px;}
 </style>
 </head>
-
 <body>
+<div id="hp">HP: 100</div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js";
 
-<script>
-
-let scene = new THREE.Scene();
-
-let camera = new THREE.PerspectiveCamera(
-75,
-window.innerWidth/window.innerHeight,
-0.1,
-1000
-);
-
-let renderer = new THREE.WebGLRenderer();
+// ===== Scene, Camera, Renderer =====
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x222222);
+const camera = new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000);
+const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth,window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-camera.position.set(0,1.6,5);
-
-let light = new THREE.PointLight(0xffffff,1);
+// ===== Light =====
+const light = new THREE.PointLight(0xffffff,1);
 light.position.set(10,10,10);
 scene.add(light);
 
-let floorGeo = new THREE.PlaneGeometry(100,100);
-let floorMat = new THREE.MeshPhongMaterial({color:0x333333});
-let floor = new THREE.Mesh(floorGeo,floorMat);
+// ===== Floor =====
+const floorGeo = new THREE.PlaneGeometry(50,50);
+const floorMat = new THREE.MeshPhongMaterial({color:0x333333});
+const floor = new THREE.Mesh(floorGeo,floorMat);
 floor.rotation.x = -Math.PI/2;
 scene.add(floor);
 
-/* súng */
+// ===== Maze walls =====
+const wallGeo = new THREE.BoxGeometry(1,2,1);
+const wallMat = new THREE.MeshPhongMaterial({color:0x00ffff});
+const maze = [
+"1111111",
+"1000001",
+"1011101",
+"1010101",
+"1010111",
+"1000001",
+"1111111"
+];
+for(let z=0; z<maze.length; z++){
+for(let x=0; x<maze[z].length; x++){
+if(maze[z][x]=="1"){
+const wall = new THREE.Mesh(wallGeo,wallMat);
+wall.position.set(x,1,z);
+scene.add(wall);
+}
+}
+}
 
-let gunGeo = new THREE.BoxGeometry(0.3,0.2,1);
-let gunMat = new THREE.MeshPhongMaterial({color:0x222222});
-let gun = new THREE.Mesh(gunGeo,gunMat);
+// ===== Player =====
+camera.position.set(1,1.6,1);
+let hp = 100;
 
+// ===== Gun =====
+const gunGeo = new THREE.BoxGeometry(0.3,0.2,1);
+const gunMat = new THREE.MeshPhongMaterial({color:0x222222});
+const gun = new THREE.Mesh(gunGeo,gunMat);
 gun.position.set(0.5,-0.5,-1);
 camera.add(gun);
-
 scene.add(camera);
 
-/* mob */
+// ===== Zombies =====
+const zombieGeo = new THREE.BoxGeometry(1,2,1);
+const zombieMat = new THREE.MeshPhongMaterial({color:0xff0000});
+const zombies = [];
+for(let i=0;i<3;i++){
+const z = new THREE.Mesh(zombieGeo,zombieMat);
+z.position.set(5-i*2,1,5);
+scene.add(z);
+zombies.push(z);
+}
 
-let mobGeo = new THREE.BoxGeometry(1,2,1);
-let mobMat = new THREE.MeshPhongMaterial({color:0xff0000});
-let mob = new THREE.Mesh(mobGeo,mobMat);
+// ===== Bullets =====
+const bullets = [];
 
-mob.position.set(0,1,0);
-scene.add(mob);
-
-let direction = 1;
-
-/* điều khiển */
-
-let keys={};
-
+// ===== Controls =====
+const keys = {};
 document.addEventListener("keydown",e=>keys[e.key]=true);
 document.addEventListener("keyup",e=>keys[e.key]=false);
+document.addEventListener("click",shoot);
 
 function move(){
-
-let speed = 0.1;
-
-if(keys["w"]) camera.position.z -= speed;
-if(keys["s"]) camera.position.z += speed;
-if(keys["a"]) camera.position.x -= speed;
-if(keys["d"]) camera.position.x += speed;
-
+const speed=0.1;
+if(keys["w"]) camera.position.z-=speed;
+if(keys["s"]) camera.position.z+=speed;
+if(keys["a"]) camera.position.x-=speed;
+if(keys["d"]) camera.position.x+=speed;
 }
 
-/* mob di chuyển */
-
-function mobMove(){
-
-mob.position.x += 0.03*direction;
-
-if(mob.position.x>5 || mob.position.x<-5){
-direction *= -1;
+// ===== Shoot =====
+function shoot(){
+const bulletGeo = new THREE.SphereGeometry(0.1,8,8);
+const bulletMat = new THREE.MeshBasicMaterial({color:0xffff00});
+const bullet = new THREE.Mesh(bulletGeo,bulletMat);
+bullet.position.set(camera.position.x,camera.position.y-0.3,camera.position.z);
+bullet.direction = new THREE.Vector3();
+camera.getWorldDirection(bullet.direction);
+scene.add(bullet);
+bullets.push(bullet);
 }
 
+// ===== Zombie AI =====
+function zombieMove(){
+zombies.forEach(z=>{
+const dir = new THREE.Vector3();
+dir.subVectors(camera.position,z.position).setY(0).normalize();
+z.position.addScaledVector(dir,0.02);
+
+// check collision with player
+if(z.position.distanceTo(camera.position)<1){
+hp-=0.5;
+document.getElementById("hp").innerText = "HP: "+Math.max(0,Math.floor(hp));
+}
+});
 }
 
-/* loop */
+// ===== Bullet Move =====
+function bulletMove(){
+for(let i=bullets.length-1;i>=0;i--){
+const b = bullets[i];
+b.position.addScaledVector(b.direction,0.5);
 
+// check collision with zombies
+for(let j=zombies.length-1;j>=0;j--){
+const z = zombies[j];
+if(b.position.distanceTo(z.position)<0.5){
+scene.remove(z);
+zombies.splice(j,1);
+scene.remove(b);
+bullets.splice(i,1);
+break;
+}
+}
+
+// remove bullet if far away
+if(b.position.distanceTo(camera.position)>50){
+scene.remove(b);
+bullets.splice(i,1);
+}
+}
+}
+
+// ===== Animate =====
 function animate(){
-
 requestAnimationFrame(animate);
-
 move();
-mobMove();
-
+zombieMove();
+bulletMove();
 renderer.render(scene,camera);
-
 }
-
 animate();
 
 </script>
-
 </body>
 </html>
